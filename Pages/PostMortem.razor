@@ -1,0 +1,119 @@
+﻿@page "/PostMortem"
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRunTime
+
+<h1 class="text-center">Post Mortem Report</h1>
+<p class ="text-center">Fill out an after action report to document a high level event.</p>
+
+<EditForm Model="@postMortemReport" OnValidSubmit="@HandleSubmit">
+    <div class="form-group custom-margin">
+        <label for="title">Title:</label>
+        <InputText id="title" class="form-control" @bind-Value="@postMortemReport.Title" />
+    </div>
+
+    <div class="form-group custom-margin date-fields">
+        <label for="dateRange">Date Range:</label>
+        <small class="form-text text-muted">Select the time range during which the events took place.</small>
+        <div class="date-field-inputs">
+            <InputDate id="startDate" class="form-control" @bind-Value="@postMortemReport.StartDate" />
+            <InputDate id="endDate" class="form-control" @bind-Value="@postMortemReport.EndDate" />
+        </div>
+    </div>
+
+    <div class="form-group custom-margin">
+        <label for="inc_summary">Incident:</label>
+        <small class="form-text text-muted">Describe the initial problems.</small>
+        <InputTextArea id="inc_summary" class="form-control" @bind-Value="@postMortemReport.Incident" />
+    </div>
+
+    <div class="form-group custom-margin">
+        <label for="summary">Summary of Events:</label>
+        <small class="form-text text-muted">Describe the events as they unfolded.</small>
+        <InputTextArea id="summary" class="form-control" @bind-Value="@postMortemReport.Summary" />
+    </div>
+
+    <div class="form-group custom-margin">
+        <label for="steps">Steps Taken for Remediation:</label>
+        <small class="form-text text-muted">List the steps taken to remediate the issue.</small>
+
+        @for (var i = 0; i < postMortemReport.Steps.Count; i++)
+        {
+            var index = i;  // Create a local copy for correct event capturing
+            <div class="form-group">
+                <label>@(i + 1).</label>
+                <InputText id="@($"step-{i}")" class="form-control" @bind-Value="@postMortemReport.Steps[index].Value" />
+            </div>
+        }
+
+        <div class="button-wrapper">
+            <button type="button" class="btn btn-secondary" @onclick="AddStep">+</button>
+        </div>
+    </div>
+
+
+    <div class="form-group custom-margin">
+        <label for="summary">Ultimate Resolution:</label>
+        <small class="form-text text-muted">What ultimately resolved the issue?</small>
+        <InputTextArea id="summary" class="form-control" @bind-Value="@postMortemReport.Resolution" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Submit</button>
+</EditForm>
+
+@code {
+    private PostMortemReport postMortemReport = new PostMortemReport();
+
+    public class Step
+    {
+        public string Value { get; set; }
+    }
+
+    private void AddStep()
+    {
+        postMortemReport.Steps.Add(new Step());
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JsRunTime.InvokeVoidAsync("applyDatePicker", "startDate");
+            await JsRunTime.InvokeVoidAsync("applyDatePicker", "endDate");
+        }
+    }
+
+    private void HandleSubmit()
+    {
+        // Handle the form submission here
+        // For now, just print the form data to the console
+        Console.WriteLine($"Title: {postMortemReport.Title}");
+        Console.WriteLine($"Start Date: {postMortemReport.StartDate}");
+        Console.WriteLine($"End Date: {postMortemReport.EndDate}");
+        Console.WriteLine($"Incident: {postMortemReport.Incident}");
+        Console.WriteLine($"Summary: {postMortemReport.Summary}");
+        Console.WriteLine("Steps Taken:");
+        int stepNumber = 1;
+        foreach (var step in postMortemReport.Steps)
+        {
+            Console.WriteLine($"{stepNumber}. {step.Value}");
+            stepNumber++;
+        }
+        Console.WriteLine($"Ultimate Resolution: {postMortemReport.Resolution}");
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/");
+    }
+
+    public class PostMortemReport
+    {
+        public string Title { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public string Summary { get; set; }
+        public string Incident { get; set; }
+        public List<Step> Steps { get; set; } = new List<Step>();
+        public string Resolution { get; set; }
+    }
+}

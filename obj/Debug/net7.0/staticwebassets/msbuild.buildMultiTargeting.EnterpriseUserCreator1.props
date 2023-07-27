@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\EnterpriseUserCreator1.props" />
+</Project>

@@ -1,0 +1,182 @@
+﻿@page "/Total_Recall"
+@inject NavigationManager NavigationManager
+
+
+<h1>Total Recall User Creation</h1>
+
+<EditForm Model="@totalRecallUser" OnValidSubmit="@HandleSubmit">
+    <div class="form-group custom-margin">
+        <label for="username">Username:</label>
+        <div class="input-group">
+            <InputText id="username" class="form-control" @bind-Value="@totalRecallUser.Username" placeholder="First Last" />
+            <button type="button" class="btn btn-secondary" @onclick="GenerateUserID">Generate</button>
+        </div>
+    </div>
+
+    <div class="form-group custom-margin">
+        <label>Email:</label>
+        <div class="input-group">
+            <div class="col-6">
+                <InputText id="emailAddress" class="form-control" @bind-Value="@emailModel.Address" />
+            </div>
+            <div class="col-6">
+                <select class="form-control" @bind="@emailModel.Domain">
+                    @foreach (var domain in emailDomains)
+                    {
+                        <option value="@domain" selected="@domain.Equals(emailModel.Domain)">@domain</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+
+
+
+    <div class="form-group custom-margin">
+        <label for="userID">User ID:</label>
+        <InputText id="userID" class="form-control" @bind-Value="@totalRecallUser.UserID" />
+    </div>
+
+    <div class="form-group custom-margin">
+        <label for="password">Password:</label>
+        <InputText id="password" type="password" class="form-control" @bind-Value="@totalRecallUser.Password" />
+    </div>
+
+    <div class="row">
+        <div class="col-6">
+            <div class="form-group custom-margin">
+                <label>User Group:</label>
+                <select id="group" class="form-control" @bind="@totalRecallUser.Group">
+                    @foreach (var group in userGroups)
+                    {
+                        <option value="@group" selected="@group.Equals(totalRecallUser.Group)">@group</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="form-group custom-margin">
+                <label>User Group:</label>
+                <select id="group" class="form-control" @bind="@totalRecallUser.Warehouse">
+                    @foreach (var group in warehouseLocations)
+                    {
+                        <option value="@group" selected="@group.Equals(totalRecallUser.Warehouse)">@group</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="button-container">
+        <button type="button" class="btn btn-primary" @onclick="@GoBack">Back</button>
+        <button type="submit" class="btn btn-primary custom-margin">Create User</button>
+    </div>
+
+
+</EditForm>
+
+
+@code {
+    private TotalRecallUser totalRecallUser = new TotalRecallUser();
+    private EmailModel emailModel = new EmailModel();
+
+
+    //------Functions------//
+    // When the generate button is pressed, generate and set User ID and password
+    private void GenerateUserID()
+    {
+        // Perform the necessary logic to generate the User ID
+        string generatedUserID = GetUserID(totalRecallUser.Username);
+
+        // Assign the generated UserID and create a default password
+        totalRecallUser.UserID = generatedUserID;
+        totalRecallUser.Password = "Warehouse22";
+        totalRecallUser.Group = "Warehouse Associates 1";
+        emailModel.Domain = "@choctawnation.com";
+    }
+    
+    // Returns User ID. User ID is simply first letter of first name followed by last name
+    private string GetUserID(string username)
+    {
+        if (!string.IsNullOrEmpty(username))
+        {
+            var usernameParts = username.Split(' ');
+            if (usernameParts.Length >= 2)
+            {
+                var firstName = usernameParts[0];
+                var lastName = usernameParts[1];
+                var firstInitial = char.ToUpper(firstName[0]);
+                var userID = $"{firstInitial}{lastName}".ToUpper();
+                return userID;
+            }
+        }
+        return string.Empty;
+    }
+
+    // Called when the button is pressed
+    private void HandleSubmit()
+    {
+        totalRecallUser.Email = emailModel.Address + emailModel.Domain;
+
+        // Handle the form submission here
+        // For now, let's just print the form data to the console
+        Console.WriteLine($"Username: {totalRecallUser.Username}");
+        Console.WriteLine($"User ID: {totalRecallUser.UserID}");
+        Console.WriteLine($"Password: {totalRecallUser.Password}");
+        Console.WriteLine($"Email: {totalRecallUser.Email}");
+        Console.WriteLine($"Group: {totalRecallUser.Group}");
+        Console.WriteLine($"Warehouse: {totalRecallUser.Warehouse}");
+
+    }
+
+    // Go to the Index page if back button is pressed
+    private void GoBack()
+    {
+        // Navigate to Application 2 User Creation Page
+        NavigationManager.NavigateTo("/");
+    }
+
+
+    //------Classes------//
+    public class TotalRecallUser
+    {
+        public string Username { get; set; }
+        public string UserID { get; set; }
+        public string Password { get; set; }
+        public string Email { get; set; }
+        public string Group { get; set; }
+        public string Warehouse { get; set; }
+    }
+
+    public class EmailModel
+    {
+        public string Address { get; set; }
+        public string Domain { get; set; }
+    }
+
+    //------Lists------//
+    private List<string> userGroups = new List<string>
+    {
+        "Warehouse Associates 1",
+        "SubAdmin",
+        "Admin"
+        // Add more user groups as needed
+    };
+
+    private List<string> warehouseLocations = new List<string>
+    {
+        "Please select the Warehouse the User will be working at",
+        "DUR - Durant FIM Warehouse",
+        "DUH - This is not a real warehouse",
+        "DIH - This is not a real warehouse"
+        // Add more warehouses here
+    };
+
+    private List<string> emailDomains = new List<string>
+    {
+        "@choctawnation.com",
+        "@cnhsa.com",
+        "Other"
+        // Add more domains if neccessary 
+    };
+}

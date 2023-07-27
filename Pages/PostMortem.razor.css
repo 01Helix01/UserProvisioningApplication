@@ -1,0 +1,41 @@
+﻿.custom-margin {
+    margin-bottom: 16px;
+}
+
+.text-center {
+    text-align: center;
+}
+
+/* Added for padding around inputs */
+#title, #startDate, #endDate, #summary {
+    padding: 10px;
+}
+
+/* Added for padding around labels */
+label {
+    padding: 3px;
+}
+
+.form-group {
+    margin: 20px 0;
+}
+
+.date-fields {
+    display: flex;
+    justify-content: space-between;
+    flex-direction: column;
+}
+
+.date-field-inputs {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+    .date-field-inputs > input {
+        width: 45%; /* You can adjust this as needed */
+    }
+
+.button-wrapper {
+    margin: 20px 0;
+}

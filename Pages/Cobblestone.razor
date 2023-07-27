@@ -1,0 +1,1058 @@
+﻿@page "/Cobblestone"
+@using Microsoft.AspNetCore.Http
+@using System.Threading.Tasks;
+@using Newtonsoft.Json;
+@using System;
+@using System.Diagnostics;
+@using System.Collections.Generic;
+@using System.Linq;
+@using System.Management.Automation;
+@using System.Text;
+@using System.Management.Automation.Runspaces;
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject IHttpContextAccessor HttpContextAccessor
+@inject AuthenticationStateProvider AuthenticationStateProvider;
+@inject IConfiguration Configuration
+@inject Microsoft.Identity.Web.ITokenAcquisition TokenAcquisition
+
+@if (!isAddedToAD)
+{
+    <h1>Cobblestone User Creation</h1>
+
+    <EditForm Model="@cobblestoneUser">
+        <div class="form-group custom-margin">
+            <div class="row">
+                <div class="col">
+                    <label for="kronos">Kronos:</label>
+                    <div class="input-group">
+                        <InputText id="kronos" class="form-control" @bind-Value="@cobblestoneUser.Kronos" placeholder="Please enter a valid kronos and click generate" />
+                        @if (!string.IsNullOrEmpty(kronosErrorMessage))
+                        {
+                            <div class="validation-message">@kronosErrorMessage</div>
+                        }
+                        <button type="button" class="btn btn-secondary" @onclick="@(() => GenerateFields())">Generate</button>
+                    </div>
+                </div>
+                <div class="col">
+                    <label for="password">Password:</label>
+                    <InputText id="password" type="password" class="form-control" @bind-Value="@cobblestoneUser.Password" />
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group custom-margin">
+            <div class="row">
+                <div class="col">
+                    <label for="name">Name:</label>
+                    <InputText id="name" class="form-control" @bind-Value="@cobblestoneUser.Name" readonly />
+                </div>
+                <div class="col">
+                    <label for="userPrincipal">User Principal:</label>
+                    <InputText id="userPrincipal" class="form-control" @bind-Value="@cobblestoneUser.UserPrincipal" readonly />
+                </div>
+            </div>
+        </div>
+
+
+
+        <div class="form-group custom-margin">
+            <label>Email:</label>
+            <div class="input-group">
+                <div class="col">
+                    <InputText id="emailAddress" class="form-control" @bind-Value="@cobblestoneUser.Email" />
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group custom-margin">
+            <div class="row">
+                <div class="col">
+                    <label>License Type:</label>
+                    <InputSelect id="licenseType" class="form-control" @bind-Value="@cobblestoneUser.License">
+                        @foreach (var license in LicenseTypes)
+                        {
+                            <option value="@license">@license</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col">
+                    <label>Title:</label>
+                    <InputText id="title" class="form-control" @bind-Value="@cobblestoneUser.Title" />
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group custom-margin">
+            <div class="row">
+                <div class="col">
+                    <label>Manager:</label>
+                    <select id="manager" class="form-control" @onchange="@((ChangeEventArgs e) => UpdateManager(e.Value.ToString()))">
+                        @foreach (var manager in ManagerNames)
+                        {
+                            <option value="@manager.ID">@manager.Name - @manager.ID</option>
+                        }
+                    </select>
+                </div>
+                <div class="col">
+                    @if (!IsReadOnlyMode)
+                    {
+                        <label>Department:</label>
+                        <select id="department" class="form-control" @onchange="@((ChangeEventArgs e) => UpdateDepartment(e.Value.ToString()))">
+                            @foreach (var department in DepartmentNames)
+                            {
+                                <option value="@department.ID">@department.Department - @department.ID</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <label>Department:</label>
+                        <input type="text" class="form-control" readonly value="@((cobblestoneUser.Department != null && !string.IsNullOrEmpty(cobblestoneUser.Department.Department)) ? $"{cobblestoneUser.Department.Department} - {cobblestoneUser.Department.ID}" : "Please select a department - 0")" />
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-center">
+            <button type="button" class="btn btn-secondary mx-2" @onclick="SetDepartmentFromManager">Mirror Manager Department</button>
+            <button type="button" class="btn btn-secondary mx-2" @onclick="ToggleDepartmentMode">Toggle Department Selector</button>
+        </div>
+
+
+        <div class="button-container">
+            <button type="button" class="btn btn-primary" @onclick="@GoBack">Back</button>
+            <button type="button" class="btn btn-primary" @onclick="@HandleSubmit">Continue</button>
+        </div>
+
+    </EditForm>
+}
+
+@if (isAddedToAD && !accountCreated)
+{
+    <h1>Cobblestone User Permissions</h1>
+
+    <form method="post" @onsubmit="() => TransferGroups(LeftGroups, RightGroups)">
+        <h2 style="text-align: center; margin-bottom: 20px; font-size: 16px;">Manage Security Groups</h2>
+        <div style="display: flex; justify-content: center;">
+            <div style="flex: 1; margin-right: 10px;">
+                <div class="checkbox-group">
+                    <div class="group-label">Available</div>
+                    @foreach (var group in LeftGroups)
+                    {
+                        <div class="checkbox-container">
+                            <label>
+                                <input type="checkbox" id="@group.Id.ToString()" @bind="group.Selected" />
+                                <span style="@GetOptionStyle(group.Selected)">@group.Name</span>
+                            </label>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div style="flex: 1; margin-left: 10px;">
+                <div class="checkbox-group">
+                    <div class="group-label">Assigned</div>
+                    @foreach (var group in RightGroups)
+                    {
+                        <div class="checkbox-container">
+                            <label>
+                                <input type="checkbox" id="@group.Id.ToString()" @bind="group.Selected" />
+                                <span style="@GetOptionStyle(group.Selected)">@group.Name</span>
+                            </label>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="centered-container">
+            <button type="submit">Transfer</button>
+        </div>
+        <div style="height: 30px;"></div>
+    </form>
+
+    <form method="post" @onsubmit="() => TransferGroups(LeftGroups2, RightGroups2)">
+        <h2 style="text-align: center; margin-bottom: 20px; font-size: 16px;">Manage Individual Permissions</h2>
+        <div style="display: flex; justify-content: center;">
+            <div style="flex: 1; margin-right: 10px;">
+                <div class="checkbox-group">
+                    <div class="group-label">Available</div>
+                    @foreach (var group in LeftGroups2)
+                    {
+                        <div class="checkbox-container">
+                            <label>
+                                <input type="checkbox" id="@group.Id.ToString()" @bind="group.Selected" />
+                                <span style="@GetOptionStyle(group.Selected)">@group.Name</span>
+                            </label>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div style="flex: 1; margin-left: 10px;">
+                <div class="checkbox-group">
+                    <div class="group-label">Assigned</div>
+                    @foreach (var group in RightGroups2)
+                    {
+                        <div class="checkbox-container">
+                            <label>
+                                <input type="checkbox" id="@group.Id.ToString()" @bind="group.Selected" />
+                                <span style="@GetOptionStyle(group.Selected)">@group.Name</span>
+                            </label>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="centered-container">
+            <button type="submit">Transfer</button>
+        </div>
+        <div style="height: 30px;"></div>
+    </form>
+
+    <form method="post" @onsubmit="() => TransferGroups(LeftGroups3, RightGroups3)">
+        <h2 style="text-align: center; margin-bottom: 5px; font-size: 16px;">Assign Additional Departments</h2>
+        <div style="display: flex; justify-content: center;">
+            <div style="flex: 1; margin-right: 10px;">
+                <div class="checkbox-group">
+                    <div class="group-label">Available</div>
+                    @foreach (var group in LeftGroups3)
+                    {
+                        <div class="checkbox-container">
+                            <label>
+                                <input type="checkbox" id="@group.Id.ToString()" @bind="group.Selected" />
+                                <span style="@GetOptionStyle(group.Selected)">@group.Name</span>
+                            </label>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div style="flex: 1; margin-left: 10px;">
+                <div class="checkbox-group">
+                    <div class="group-label">Assigned</div>
+                    @foreach (var group in RightGroups3)
+                    {
+                        <div class="checkbox-container">
+                            <label>
+                                <input type="checkbox" id="@group.Id.ToString()" @bind="group.Selected" />
+                                <span style="@GetOptionStyle(group.Selected)">@group.Name</span>
+                            </label>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="centered-container">
+            <button type="submit">Transfer</button>
+        </div>
+        <div style="height: 30px;"></div>
+    </form>
+
+
+    <div class="button-container">
+        <button type="button" class="btn btn-primary" @onclick="@GoBack">Back</button>
+        <button type="button" class="btn btn-primary" @onclick="@CreateAccount">Continue</button>
+    </div>
+}
+
+@if (accountCreated)
+{
+    <div class="container mt-5">
+        <div class="card p-4">
+            <div class="card-body">
+                <h1 class="card-title text-center mb-4">Account Successfully Created!</h1>
+                <div class="ml-4 mt-3">
+                    <strong>User Name:</strong> @cobblestoneUser.Name<br />
+                    <strong>User ID:</strong> @cobblestoneUser.GeneratedID
+                    <strong>User Principal:</strong> @cobblestoneUser.UserPrincipal
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="button" class="btn btn-primary" onclick="@(() => RedirectToPage("/Cobblestone"))">Create Another</button>
+                    <button type="button" class="btn btn-primary" onclick="@(() => RedirectToPage("/"))">Back to Home</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+@code {
+    // Flags for html
+    private bool isDepartmentsPopulated = false;
+    private bool isAddedToAD = false;
+    private bool accountCreated = false;
+    private bool IsReadOnlyMode = true;
+    private string kronosErrorMessage = "";
+
+    // Global variables for API calls
+    private HttpClient httpClient;
+    private static string accessToken;
+
+    // Class instances
+    private CobblestoneUser cobblestoneUser = new CobblestoneUser();
+    private UserInfoModel userInfo = new UserInfoModel();
+    private HashSet<GroupModel> selectedLeftGroups = new HashSet<GroupModel>();
+    private HashSet<GroupModel> selectedRightGroups = new HashSet<GroupModel>();
+
+    //------Functions------//
+    // Called when the generation button is pressed, gets info from AD and calls cobblestone API to populate mgr and dep
+    private async void GenerateFields()
+    {
+        if (KronosIsValid())
+        {
+            userInfo = GetUserInformation(cobblestoneUser.Kronos);
+
+            // Set everything that can be found in AD
+            cobblestoneUser.License = "Standard";
+            cobblestoneUser.Email = userInfo.Email;
+            cobblestoneUser.Name = userInfo.Name;
+            cobblestoneUser.Title = userInfo.Title;
+            cobblestoneUser.UserPrincipal = userInfo.UserPrincipalName;
+            cobblestoneUser.Password = "UserWillResetMe";
+
+
+            // Parse Manager from json string and search cobblestone for that person
+            string temp = userInfo.Manager;
+            if (temp != null)
+            {
+                int startIndex = temp.IndexOf("CN=") + 3; // Add 3 to skip "CN="
+                int endIndex = temp.IndexOf(",", startIndex);
+                string parsedString = temp.Substring(startIndex, endIndex - startIndex);
+                string[] nameParts = parsedString.Split(' ');
+                string lastName = nameParts[nameParts.Length - 1];
+
+                // Do some API calling unless departments already populated
+                await CobblestoneAPI();
+                await CobblestoneAPIUserSearch(lastName);
+                if (isDepartmentsPopulated == false) await CobblestoneAPIDepartments();
+            }
+            else Console.WriteLine("Manager was null!");
+        }
+    }
+
+    // Fill boxes that can be auto filled based on the Kronos
+    private UserInfoModel GetUserInformation(string userPrincipalName)
+    {
+        // Run powershell
+        var processInfo = new ProcessStartInfo();
+        processInfo.FileName = "powershell.exe";
+        processInfo.Arguments = $"-ExecutionPolicy Bypass -File Data\\getuserinfo.ps1 -userPrincipalName \"{userPrincipalName}\"";
+        processInfo.RedirectStandardOutput = true;
+        processInfo.UseShellExecute = false;
+
+        var process = new Process();
+        process.StartInfo = processInfo;
+        process.Start();
+
+        // Read the output of the PowerShell script
+        var output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+
+
+        // Deserialize the JSON string
+        var userInfo = JsonConvert.DeserializeObject<UserInfoModel>(output);
+
+        return userInfo;
+    }
+
+    // Validates Kronos that is given by user using AD
+    private bool KronosIsValid()
+    {
+        string response = ValidateKronos(cobblestoneUser.Kronos);
+
+        if (response.Contains("valid kronos"))
+        {
+            // Make sure we aren't displaying the error message
+            kronosErrorMessage = "";
+            return true;
+        }
+        else
+        {
+            // Display the error message
+            kronosErrorMessage = "Invalid Kronos. Please enter a valid value.";
+            return false;
+        }
+    }
+
+    // Validate user utilizing Powershell to connect to AD
+    private string ValidateKronos(string userPrincipalName)
+    {
+        var processInfo = new ProcessStartInfo();
+        processInfo.FileName = "powershell.exe";
+        processInfo.Arguments = $"-ExecutionPolicy Bypass -File Data\\validateKronos.ps1 -userPrincipalName \"{userPrincipalName}\"";
+        processInfo.RedirectStandardOutput = true; // Capture the script's output
+        processInfo.UseShellExecute = false; // Ensure that the standard output can be redirected
+
+        var process = new Process();
+        process.StartInfo = processInfo;
+
+        process.Start();
+        string output = process.StandardOutput.ReadToEnd(); // Read the script's output
+
+        process.WaitForExit();
+
+        return output;
+    }
+
+    // Called when first continue is pressed, only proceeds if the given Kronos is valid
+    // TODO: Adds user to the Cobblestone Active Directory group so they can have access to it
+    private void HandleSubmit()
+    {
+        if (KronosIsValid())
+        {
+            GiveCobblestoneAccess();
+
+            // Convert data to jsonString
+            string jsonString = cobblestoneUser.ToJsonString();
+            Console.WriteLine(jsonString);
+        }
+    }
+
+    // TODO: Add user to the Cobblestone Group in Active Directory
+    // Currently just sets flag to true as we do not have AD connectivity
+    private void GiveCobblestoneAccess()
+    {
+        /* 3 possible conditions:
+            1. Not in AD group no account -> proceed
+            2. In AD group no account -> skip past this function, still set isAddedToAD = true
+            3. In AD group and has account -> error message "This user already has an account!"
+        */
+
+        // Set the flag to true
+        isAddedToAD = true;
+
+        Console.WriteLine("TODO: Add user to the Cobblestone group in Active Directory here");
+    }
+
+    // Back button works by reverting the flag or returning to previous page
+    private void GoBack()
+    {
+        if (isAddedToAD) isAddedToAD = false;
+        else RedirectToPage("/");
+    }
+
+    // Transfer groups from left to right upon clicking the button
+    private void TransferGroups(List<GroupModel> leftGroups, List<GroupModel> rightGroups)
+    {
+        foreach (var group in leftGroups.ToList())
+        {
+            if (group.Selected)
+            {
+                group.Selected = false;
+                leftGroups.Remove(group);
+                rightGroups.Add(group);
+            }
+        }
+
+        foreach (var group in rightGroups.ToList())
+        {
+            if (group.Selected)
+            {
+                group.Selected = false;
+                rightGroups.Remove(group);
+                leftGroups.Add(group);
+            }
+        }
+
+        selectedLeftGroups.Clear();
+        selectedRightGroups.Clear();
+    }
+
+    // Adds the user to the Cobblestone Groups specified in the page
+    private void GroupAssignment()
+    {
+        // Security
+        Console.WriteLine("Security Groups: ");
+        foreach (GroupModel groupModel in RightGroups)
+        {
+            Console.Write(groupModel.Name + "; ");
+        }
+        Console.WriteLine("");
+
+
+        // Permissions
+        Console.WriteLine("Permission Groups: ");
+        foreach (GroupModel groupModel in RightGroups2)
+        {
+            Console.Write(groupModel.Name + "; ");
+        }
+        Console.WriteLine("");
+
+        // Departments
+        Console.WriteLine("Department Groups: ");
+        foreach (GroupModel groupModel in RightGroups3)
+        {
+            Console.Write(groupModel.Name + "; ");
+        }
+        Console.WriteLine("");
+    }
+
+    // Bold groups when selected
+    private string GetOptionStyle(bool isSelected)
+    {
+        if (isSelected) return "font-weight: bold";
+        else return "";
+    }
+
+    // Called when continue button in user permissions is pressed
+    // Use the information gathered and the API to create the Cobblestone User then display the success screen
+    private void CreateAccount()
+    {
+        GroupAssignment();
+        CobblestoneUserCreation();
+
+        // Send to success screen
+        accountCreated = true;
+    }
+
+    // Send user to another page, or refresh if directed back to this one
+    private void RedirectToPage(string pageName)
+    {
+        if (pageName == "/Cobblestone")
+        {
+            JSRuntime.InvokeVoidAsync("location.reload");
+
+        }
+        else NavigationManager.NavigateTo(pageName);
+    }
+
+    // Select manager
+    private void UpdateManager(string selectedManagerId)
+    {
+        try
+        {
+            int managerId = int.Parse(selectedManagerId);
+            cobblestoneUser.Manager = ManagerNames.FirstOrDefault(manager => manager.ID == managerId);
+        }
+        catch (Exception ex)
+        {
+            // Handle the exception gracefully
+            Console.WriteLine("Error occurred while updating the manager: " + ex.Message);
+        }
+    }
+
+    // Select department
+    private void UpdateDepartment(string selectedDepartmentId)
+    {
+        try
+        {
+            int departmentId = int.Parse(selectedDepartmentId);
+            cobblestoneUser.Department = DepartmentNames.FirstOrDefault(department => department.ID == departmentId);
+        }
+        catch (Exception ex)
+        {
+            // Handle the exception gracefully
+            Console.WriteLine("Error occurred while updating the department: " + ex.Message);
+        }
+    }
+
+    // When mirror button is pressed this function is called
+    private void SetDepartmentFromManager()
+    {
+        var selectedDepartmentId = cobblestoneUser.Manager.DepartmentID;
+        cobblestoneUser.Department = DepartmentNames.FirstOrDefault(d => d.ID == selectedDepartmentId);
+        IsReadOnlyMode = true;
+
+        // Trigger a re-render of the component to reflect the updated selected department
+        StateHasChanged();
+    }
+
+    // Toggles from readOnly to selection mode
+    private void ToggleDepartmentMode()
+    {
+        IsReadOnlyMode = !IsReadOnlyMode;
+    }
+
+    //------Classes------//
+    // Class of fields for Cobblestone user creation
+    public class CobblestoneUser
+    {
+        public CobblestoneUser()
+        {
+            Manager = new ManagerModel(); // Initialize Manager property
+            Department = new DepartmentModel(); // Initialize Department property
+        }
+
+        public string Kronos { get; set; }
+        public string Name { get; set; }
+        public string Password { get; set; }
+        public string Email { get; set; }
+        public string License { get; set; }
+        public ManagerModel Manager { get; set; }
+        public string Title { get; set; }
+        public DepartmentModel Department { get; set; }
+        public string UserPrincipal { get; set; }
+
+        // For when user is created
+        public int GeneratedID { get; set; }
+
+
+        // Convert to json
+        public string ToJsonString()
+        {
+            return JsonConvert.SerializeObject(this);
+        }
+    }
+
+    // Class that creates a department object
+    public class DepartmentInfo
+    {
+        [JsonProperty("DepartmentID")]
+        public int DepartmentID { get; set; }
+
+        [JsonProperty("Department")]
+        public string Department { get; set; }
+    }
+
+    // Class used for Manager information
+    public class UserInfo
+    {
+        [JsonProperty("EmployeeID")]
+        public int EmployeeID { get; set; }
+
+        [JsonProperty("Department")]
+        public int Department { get; set; }
+
+        [JsonProperty("FullName")]
+        public string FullName { get; set; }
+    }
+
+    // Class that creates a group object
+    public class GroupModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public bool Selected { get; set; }
+    }
+
+    // Used for setting AD user as Cobblestone user
+    public class UserInfoModel
+    {
+        public string Email { get; set; }
+        public string Name { get; set; }
+        public string Department { get; set; }
+        public string Title { get; set; }
+        public string UserPrincipalName { get; set; }
+        public string Manager { get; set; }
+    }
+
+    // Used for creating a list of Managers
+    public class ManagerModel
+    {
+        public string Name { get; set; }
+        public int ID { get; set; }
+        public int DepartmentID { get; set; }
+
+        public override string ToString()
+        {
+            return Name;
+        }
+    }
+
+    // Used for creating a list of Departments
+    public class DepartmentModel
+    {
+        public string Department { get; set; }
+        public int ID { get; set; }
+
+        public override string ToString()
+        {
+            return Department;
+        }
+    }
+
+    // Used for dynamically creating list of filters
+    public class Filter
+    {
+        public string Condition { get; set; }
+        public string Field { get; set; }
+        public string Id { get; set; }
+        public string Input { get; set; }
+        public string Operator { get; set; }
+        public string[] Rules { get; set; }
+        public string Type { get; set; }
+        public string Value { get; set; }
+    }
+
+    //------Lists------//
+    // Lists for the different liscense types
+    private List<string> LicenseTypes { get; set; } = new List<string>
+    {
+        "Standard",
+        "Super",
+        "Admin",
+        "ReadOnly"
+    };
+
+    // List of managers and departments used for the dropdowns in the first page
+    private List<ManagerModel> ManagerNames = new List<ManagerModel>()
+    {
+        new ManagerModel { ID = 0, Name = "Please select a manager", DepartmentID = 0 }
+    };
+    private List<DepartmentModel> DepartmentNames = new List<DepartmentModel>()
+    {
+        new DepartmentModel { ID = 0, Department = "Please select a department"}
+    };
+
+    // Lists for Left permissions (Unassigned groups)
+    private List<GroupModel> LeftGroups { get; set; } = new List<GroupModel>()
+    {
+        // Eventually, this should auto populate from Cobblestone data
+
+        new GroupModel { Id = 15, Name = "Legal", Selected = false },
+        new GroupModel { Id = 21, Name = "Legal Admin", Selected = false },
+        new GroupModel { Id = 12, Name = "Standard User-Employee", Selected = false },
+        new GroupModel { Id = 11, Name = "Standard User-Manager", Selected = false },
+        new GroupModel { Id = 13, Name = "Super User-Employee", Selected = false },
+        new GroupModel { Id = 14, Name = "Super User-Manager", Selected = false },
+        new GroupModel { Id = 20, Name = "Intern", Selected = false },
+        new GroupModel { Id = 23, Name = "Construction", Selected = false },
+        new GroupModel { Id = 17, Name = "Procurement Buyer", Selected = false },
+        new GroupModel { Id = 22, Name = "Procurement Admin", Selected = false },
+        new GroupModel { Id = 4, Name = "Test", Selected = false }
+    };
+    private List<GroupModel> LeftGroups2 { get; set; } = new List<GroupModel>()
+    {
+        // Eventually, this should auto populate from Cobblestone data
+
+        new GroupModel { Id = 1, Name = "Permissions 1", Selected = false },
+        new GroupModel { Id = 2, Name = "Permissions 2", Selected = false },
+        new GroupModel { Id = 3, Name = "Permissions 3", Selected = false },
+        new GroupModel { Id = 4, Name = "Permissions 4", Selected = false },
+        new GroupModel { Id = 5, Name = "Permissions 5", Selected = false },
+        new GroupModel { Id = 3, Name = "Permissions 6", Selected = false }
+    };
+    private List<GroupModel> LeftGroups3 { get; set; } = new List<GroupModel>();
+
+    // Lists for Right permissions (Assigned groups)
+    private List<GroupModel> RightGroups { get; set; } = new List<GroupModel>();
+    private List<GroupModel> RightGroups2 { get; set; } = new List<GroupModel>();
+    private List<GroupModel> RightGroups3 { get; set; } = new List<GroupModel>();
+
+    //------API Functions------//
+    // Make initial API call and store token
+    static async Task CobblestoneAPI()
+    {
+        string oauth2Server = "https://Choctawstage.cobblestone.software/Api2/oauth/token";
+
+        // Clident ID and Secret go here:
+        string clientId = "";
+        string clientSecret = "";
+
+        var httpClient = new HttpClient();
+        var requestData = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("grant_type", "client_credentials"),
+            new KeyValuePair<string, string>("client_id", clientId),
+            new KeyValuePair<string, string>("client_secret", clientSecret)
+    });
+
+        HttpResponseMessage response = await httpClient.PostAsync(oauth2Server, requestData);
+        string responseBody = await response.Content.ReadAsStringAsync();
+
+        if (response.IsSuccessStatusCode)
+        {
+            var responseData = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseBody);
+            accessToken = responseData["access_token"];
+            //Console.WriteLine($"Access Token: {accessToken}");
+        }
+        else
+        {
+            Console.WriteLine($"Token request failed. Status code: {response.StatusCode}");
+        }
+    }
+
+    // Get user information from Cobblestone (used for managers)
+    private async Task CobblestoneAPIUserSearch(string name)
+    {
+        httpClient = new HttpClient();
+        httpClient.BaseAddress = new Uri("https://Choctawstage.cobblestone.software/Api2/CSSAPI/v2/");
+
+        try
+        {
+            // Set headers and authentication
+            httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + accessToken);
+
+            var headers = new Dictionary<string, string>
+            {
+                { "Content-Type", "application/json" },
+                { "Accept", "application/json" },
+                { "Authorization", $"Bearer {accessToken}" }
+            };
+
+            var body1 = JsonConvert.SerializeObject(new
+            {
+                Fields = new object[] { },
+                Clause = new
+                {
+                    Condition = "AND",
+                    Field = default(string),
+                    Id = default(string),
+                    Input = default(string),
+                    Operator = default(string),
+                    Type = default(string),
+                    Value = default(string),
+                    Rules = new[]
+                    {
+                        new
+                        {
+                            Condition = default(string),
+                            Field = "LastName",
+                            Id = "LastName",
+                            Input = default(string),
+                            Operator = "contains",
+                            Rules = default(string[]),
+                            Type = "string",
+                            Value = name
+                        }
+    }
+                },
+                OrderByTag = new
+                {
+                    Fields = new[] { "EmployeeID" },
+                    Direction = "ASC"
+                },
+                GroupByTag = new object[] { },
+                StartIndex = 0,
+                Length = 10
+            });
+
+            // Make the API call
+            HttpResponseMessage response1 = await httpClient.PostAsync(httpClient.BaseAddress + "employees/Get", new StringContent(body1, Encoding.UTF8, "application/json"));
+
+            // Handle the API response 1
+            string responseBody1 = await response1.Content.ReadAsStringAsync();
+            if (response1.IsSuccessStatusCode)
+            {
+                // API call successful
+                ManagerPopulation(responseBody1);
+                Console.WriteLine("API call 1 (searching for user information) successful");
+            }
+            else
+            {
+                // API call failed
+                Console.WriteLine("API call 1 failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Handle exception
+            Console.WriteLine("An error occurred:");
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    // Get the json of all departments in Cobblestone
+    private async Task CobblestoneAPIDepartments()
+    {
+        httpClient = new HttpClient();
+        httpClient.BaseAddress = new Uri("https://Choctawstage.cobblestone.software/Api2/CSSAPI/v2/");
+
+        try
+        {
+            // Set headers and authentication
+            httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + accessToken);
+
+            var headers = new Dictionary<string, string>
+            {
+                { "Content-Type", "application/json" },
+                { "Accept", "application/json" },
+                { "Authorization", $"Bearer {accessToken}" }
+            };
+
+            var body2 = JsonConvert.SerializeObject(new
+            {
+                Fields = new object[] { },
+                StartIndex = 0,
+                Length = 150
+            });
+
+            // Make the API call
+            HttpResponseMessage response2 = await httpClient.PostAsync(httpClient.BaseAddress + "departments/Get", new StringContent(body2, Encoding.UTF8, "application/json"));
+
+            // Handle the API response 2
+            string responseBody2 = await response2.Content.ReadAsStringAsync();
+            if (response2.IsSuccessStatusCode)
+            {
+                // API call successful
+                DepartmentPopulation(responseBody2);
+                isDepartmentsPopulated = true;
+                Console.WriteLine("API call 2 (populate user departments) successful");
+            }
+            else
+            {
+                // API call failed
+                Console.WriteLine("API call 2 failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Handle exception
+            Console.WriteLine("An error occurred:");
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    // Create the user with the input we recieved
+    private async Task CobblestoneUserCreation()
+    {
+        httpClient = new HttpClient();
+        httpClient.BaseAddress = new Uri("https://Choctawstage.cobblestone.software/Api2/CSSAPI/v2/");
+
+        try
+        {
+            // Set headers and authentication
+            httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + accessToken);
+
+            var headers = new Dictionary<string, string>
+            {
+                { "Content-Type", "application/json" },
+                { "Accept", "application/json" },
+                { "Authorization", $"Bearer {accessToken}" }
+            };
+
+            // Assuming cobblestoneUser.Name is in the format "FirstName (Middle name possible) LastName"
+            string fullName = cobblestoneUser.Name;
+            string[] nameParts = fullName.Split(' ');
+
+            // Extracting first name and last name from the array
+            string first = nameParts[0];
+            string last = nameParts[nameParts.Length - 1];
+
+
+            var tuples = new object[]
+            {
+                new { Name = "FirstName", Value = first },
+                new { Name = "LastName", Value = last },
+                new { Name = "Department", Value = cobblestoneUser.Department.ID },
+                new { Name = "Manager", Value = cobblestoneUser.Manager.ID },
+                new { Name = "Title", Value = cobblestoneUser.Title },
+                new { Name = "Email", Value = cobblestoneUser.Email },
+                new { Name = "UserName", Value = cobblestoneUser.UserPrincipal },
+                new { Name = "ActiveYN", Value = "true" },
+                new { Name = "LicenseType", Value = cobblestoneUser.License }
+            };
+
+            // Create a container object and assign the array to its Tuples property
+            var container = new { Tuples = tuples };
+
+            // Serialize the container object to JSON
+            string json = JsonConvert.SerializeObject(container);
+
+            Console.WriteLine(json);
+
+            // Make the API call
+            HttpResponseMessage responseCreation = await httpClient.PostAsync(httpClient.BaseAddress + "employees/Add", new StringContent(json, Encoding.UTF8, "application/json"));
+
+            // Handle the API response 1
+            string responseBodyCreation = await responseCreation.Content.ReadAsStringAsync();
+            if (responseCreation.IsSuccessStatusCode)
+            {
+                // API call successful
+                Console.WriteLine("API creation call successful");
+                Console.WriteLine(responseBodyCreation);
+
+                // Parse the responseBodyCreation JSON
+                var responseObj = JsonConvert.DeserializeObject<dynamic>(responseBodyCreation);
+
+                // Extract the GeneratedId value
+                int genID = responseObj.GeneratedId;
+
+                // Print the GeneratedId
+                cobblestoneUser.GeneratedID = genID;
+            }
+            else
+            {
+                // API call failed
+                Console.WriteLine("API creation call failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Handle exception
+            Console.WriteLine("An error occurred:");
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    // Parse the json returned from user search API call and add them to MGRs
+    private void ManagerPopulation(string response)
+    {
+        // Deserialize the JSON string into a list of DepartmentInfo objects
+        List<UserInfo> managerList = JsonConvert.DeserializeObject<List<UserInfo>>(response);
+
+        // Extract the values of DepartmentID and Department from each DepartmentInfo object
+        foreach (UserInfo userInfo in managerList)
+        {
+            int managerID = userInfo.EmployeeID;
+            string name = userInfo.FullName;
+            int department = userInfo.Department;
+
+            // Check if the manager already exists in the ManagerNames list
+            if (ManagerNames.Any(m => m.ID == managerID))
+            {
+                continue; // Skip adding duplicates
+            }
+
+
+            // Create Manager object
+            ManagerModel mgr = new ManagerModel
+                {
+                    ID = managerID,
+                    Name = name,
+                    DepartmentID = department
+                };
+
+            // Add the Manager object to the Manager list
+            ManagerNames.Add(mgr);
+
+            StateHasChanged();
+        }
+    }
+
+    // Populate department selection in the first page
+    private void DepartmentPopulation(string response)
+    {
+        // Deserialize the JSON string into a list of DepartmentInfo objects
+        List<DepartmentInfo> departmentList = JsonConvert.DeserializeObject<List<DepartmentInfo>>(response);
+
+        // Extract the values of DepartmentID and Department from each DepartmentInfo object
+        foreach (DepartmentInfo departmentInfo in departmentList)
+        {
+            int departmentID = departmentInfo.DepartmentID;
+            string departmentName = departmentInfo.Department;
+
+            // Check if the department already exists in the DepartmentNames list
+            if (DepartmentNames.Any(d => d.ID == departmentID))
+            {
+                continue; // Skip adding duplicates
+            }
+
+            // Create DepartmentModel object and add to list
+            DepartmentModel departmentModel = new DepartmentModel
+                {
+                    ID = departmentID,
+                    Department = departmentName
+                };
+            DepartmentNames.Add(departmentModel);
+            Console.WriteLine(departmentName);
+
+            // Create GroupModel object and add to list
+            GroupModel group = new GroupModel
+                {
+                    Id = departmentID,
+                    Name = departmentName,
+                    Selected = false
+                };
+            LeftGroups3.Add(group);
+        }
+
+        // Sort the lists alphabetically by Name
+        DepartmentNames = DepartmentNames.OrderBy(g => g.Department).ToList();
+        LeftGroups3 = LeftGroups3.OrderBy(g => g.Name).ToList();
+
+        StateHasChanged();
+    }
+}

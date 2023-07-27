@@ -1,0 +1,16 @@
+﻿.custom-margin {
+    margin-bottom: 16px;
+}
+
+.centered-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+    gap: 20px; /* Adjust the gap size as needed */
+}
+
+.button-container {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}

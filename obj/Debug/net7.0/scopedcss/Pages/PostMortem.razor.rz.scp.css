@@ -1,0 +1,41 @@
+.custom-margin[b-aqjtrpo58e] {
+    margin-bottom: 16px;
+}
+
+.text-center[b-aqjtrpo58e] {
+    text-align: center;
+}
+
+/* Added for padding around inputs */
+#title[b-aqjtrpo58e], #startDate[b-aqjtrpo58e], #endDate[b-aqjtrpo58e], #summary[b-aqjtrpo58e] {
+    padding: 10px;
+}
+
+/* Added for padding around labels */
+label[b-aqjtrpo58e] {
+    padding: 3px;
+}
+
+.form-group[b-aqjtrpo58e] {
+    margin: 20px 0;
+}
+
+.date-fields[b-aqjtrpo58e] {
+    display: flex;
+    justify-content: space-between;
+    flex-direction: column;
+}
+
+.date-field-inputs[b-aqjtrpo58e] {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+    .date-field-inputs > input[b-aqjtrpo58e] {
+        width: 45%; /* You can adjust this as needed */
+    }
+
+.button-wrapper[b-aqjtrpo58e] {
+    margin: 20px 0;
+}

@@ -1,0 +1,147 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\587761\\source\\repos\\UserCreationApp\\EnterpriseUserCreator1\\EnterpriseUserCreator1.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\587761\\source\\repos\\UserCreationApp\\EnterpriseUserCreator1\\EnterpriseUserCreator1.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\587761\\source\\repos\\UserCreationApp\\EnterpriseUserCreator1\\EnterpriseUserCreator1.csproj",
+        "projectName": "EnterpriseUserCreator1",
+        "projectPath": "C:\\Users\\587761\\source\\repos\\UserCreationApp\\EnterpriseUserCreator1\\EnterpriseUserCreator1.csproj",
+        "packagesPath": "C:\\Users\\587761\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\587761\\source\\repos\\UserCreationApp\\EnterpriseUserCreator1\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\587761\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net7.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\sdk\\7.0.304\\Sdks\\Microsoft.NET.Sdk.Web\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net7.0": {
+            "targetAlias": "net7.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net7.0": {
+          "targetAlias": "net7.0",
+          "dependencies": {
+            "Azure.Core": {
+              "target": "Package",
+              "version": "[1.33.0, )"
+            },
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[7.0.8, )",
+              "noWarn": [
+                "NU1605"
+              ]
+            },
+            "Microsoft.AspNetCore.Authentication.OpenIdConnect": {
+              "target": "Package",
+              "version": "[7.0.8, )",
+              "noWarn": [
+                "NU1605"
+              ]
+            },
+            "Microsoft.Graph": {
+              "target": "Package",
+              "version": "[5.16.0, )"
+            },
+            "Microsoft.Graph.Core": {
+              "target": "Package",
+              "version": "[3.0.9, )"
+            },
+            "Microsoft.Identity.Client": {
+              "target": "Package",
+              "version": "[4.54.1, )"
+            },
+            "Microsoft.Identity.Web": {
+              "target": "Package",
+              "version": "[2.12.4, )"
+            },
+            "Microsoft.Identity.Web.TokenAcquisition": {
+              "target": "Package",
+              "version": "[2.12.4, )"
+            },
+            "Microsoft.Identity.Web.UI": {
+              "target": "Package",
+              "version": "[2.12.4, )"
+            },
+            "Microsoft.PowerShell.Commands.Diagnostics": {
+              "target": "Package",
+              "version": "[7.3.5, )"
+            },
+            "Microsoft.PowerShell.Commands.Management": {
+              "target": "Package",
+              "version": "[7.3.5, )"
+            },
+            "Microsoft.PowerShell.Commands.Utility": {
+              "target": "Package",
+              "version": "[7.3.5, )"
+            },
+            "Microsoft.PowerShell.ConsoleHost": {
+              "target": "Package",
+              "version": "[7.3.5, )"
+            },
+            "Microsoft.WSMan.Management": {
+              "target": "Package",
+              "version": "[7.3.5, )"
+            },
+            "NETStandard.Library": {
+              "target": "Package",
+              "version": "[2.0.3, )"
+            },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.3, )"
+            },
+            "System.Management.Automation": {
+              "target": "Package",
+              "version": "[7.3.5, )"
+            },
+            "System.Reactive.Windows.Forms": {
+              "target": "Package",
+              "version": "[6.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.304\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
